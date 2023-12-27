@@ -1,5 +1,5 @@
-#ifndef PROTOCOM_INC_H
-#define PROTOCOM_INC_H
+#ifndef ESPBASIC_INC_H
+#define ESPBASIC_INC_H
 
 #ifndef SERIAL_PORT_SPEED
 #define SERIAL_PORT_SPEED  115200
