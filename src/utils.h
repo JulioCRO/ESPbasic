@@ -1,23 +1,29 @@
+#ifndef ESPBASIC_UTILS_H
+#define ESPBASIC_UTILS_H
 #include <Arduino.h>
+#include <variables.h>
 #include <ArduinoJson.h>
-#include "FS.h"
 #include <LittleFS.h>
+#include "FS.h"
 
-#define OK  " OK "
-#define ERRO  "ERRO"
-#define INFO  "INFO"
 
+#ifdef ESP32
+#include <WiFi.h>
+#include <esp_wifi.h>
+#include <AsyncTCP.h>
+#include <ESPmDNS.h>
+#elif defined(ESP8266)
+#include <ESP8266WiFi.h>
+#include <ESPAsyncTCP.h>
+#include <ESP8266mDNS.h>
+#endif
 
 void logger(const char type[10], String msg);
 bool parseJSON(String fileORjson, DynamicJsonDocument &json);
 
 
-
-
-
 void logger(const char type[10], String msg) {
   Serial.printf("[%s] %s\r\n", type, msg.c_str());
-
 }
 
 bool parseJSON(String fileORjson, DynamicJsonDocument &json)
@@ -77,3 +83,5 @@ bool parseJSON(String fileORjson, DynamicJsonDocument &json)
 
   return !_setError;
 }
+
+#endif
