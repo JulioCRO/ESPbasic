@@ -3,24 +3,25 @@
 
 int testct=0;
 
+#include <common.h>
+
 #include <Arduino.h>
 #include <LittleFS.h>
 #include "FS.h"
-#include <StreamString.h>
 
-#include <variables.h>
-#include <utils.h>
+
 #include <basicWifi.h>
-#include <basicLoop.h>
+#include <basicServer.h>
 
-AsyncWebServer server(80);
 
 void startBasic();
 
 
 
 void startBasic(){
-
+//disableCore0WDT();
+//disableCore1WDT();
+//disableLoopWDT();
   Serial.begin(SERIAL_PORT_SPEED);
       Serial.println("PROTOCOM - www.protocom.tech.br");
   while (!Serial) {
@@ -45,44 +46,10 @@ void startBasic(){
 
 //********* CONFIG WIFI ***********
 configWIFI();
-
-    /* SERVER CONFIG */
-  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
-  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "PUT,POST,GET,OPTIONS");
-  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "*");
-
-
-  server.rewrite("/", "/index.html");
-	
-	server.rewrite("/generate_204", "/index.html");
-	
-	server.rewrite("/fwlink", "/index.html");
-
-   server.on("/index.html", HTTP_GET, [&](AsyncWebServerRequest *request) {
-            request->send(200, "text/html", "<h1>INDEX</h1>" );
-        });	
-	server.serveStatic("/", LittleFS, "/").setDefaultFile("/index.html");
-
-  server.onNotFound([](AsyncWebServerRequest * request)
-  {
-    if (request->method() == HTTP_OPTIONS)
-    {
-      logger(INFO,"Response OPTIONS for:" + request->url());
-	  request->send(200);
-    }else{
-	  logger(INFO,"Response NOT FOUND for:" + request->url());
-      request->send(404, "text/plain", "PROTOCOM 404 ->" + request->url());
-    }
-
-  });
-	
-
- server.on("/description.xml", HTTP_GET, [&](AsyncWebServerRequest *request) {
-            request->send(200, "text/xml", SSDP.getSchema());
-        });
-
-server.begin();
+basicServer();
 basicLoop();
+//addLoopFunction(getHeapStatus,"Heap status");
+
 }
 
 

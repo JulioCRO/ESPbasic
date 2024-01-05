@@ -5,38 +5,30 @@
 
 #ifndef ESPBASIC_WIFIMON_H
 #define ESPBASIC_WIFIMON_H
-#include <variables.h>
-#include <utils.h>
-#include <basicLoop.h>
+
+#include <common.h>
 
 
-#ifdef ESP32
-#include <WiFi.h>
-#include <esp_wifi.h>
-#include <AsyncTCP.h>
-#include <ESPmDNS.h>
-#include "ESP32SSDP.h"
-#include <DNSServer.h>
-#elif defined(ESP8266)
-#include <ESP8266WiFi.h>
-#include <ESPAsyncTCP.h>
-#include <ESP8266mDNS.h>
-#endif
-#include <ESPAsyncWebServer.h>
+
+
 
 DNSServer DNS;
 
 
-int _staStatus=8, _wifimon_ct=0;
-bool _startAP=true, _useDNS=false;
+int _staStatus=8, _wifimon_ct=100;
+bool _startAP=true, _useDNS=false, _check_scan=false;
+AsyncWebServerRequest *scan_request;
 void configWIFI();
 void WiFiMonitor();
 void startAP();
 void stopAP();
 String wifiStatus(int status);
 String getMacAddr(int sz=12);
-
-
+void scanWIFI(AsyncWebServerRequest *_request);
+void scanWIFIResult(AsyncWebServerRequest *_request);
+void scanWIFInew(void *pvParameters);
+int getQuality(int i);
+//DynamicJsonDocument wifijson(1024);
 void WiFiMonitor()
 {
  if (_useDNS){
@@ -218,6 +210,7 @@ if (WiFi.isConnected()){
      WiFi.setAutoReconnect(true);
      WiFi.waitForConnectResult();
     addLoopFunction(WiFiMonitor, "WiFiMonitor agendado.");
+    //addLoopFunction(scanWIFIResult, "scanWIFIResult agendado.");
 
     if (!MDNS.begin(HOST_NAME)) {
        logger(ERRO, "Iniciando MDNS responder!");
@@ -241,6 +234,117 @@ String getMacAddr(int sz){
   mac.toLowerCase();
   return mac.substring(idx);
 
+}
+
+void scanWIFI(AsyncWebServerRequest *_request){
+ xTaskCreate(scanWIFInew,    // Função a ser chamada
+    "Scan WiFi",   // Nome da tarefa
+    10000,            // Tamanho (bytes)
+    (void*) _request,            // Parametro a ser passado
+    1,               // Prioridade da Tarefa
+    NULL             // Task handle
+  );
+
+}
+
+void scanWIFIResult(AsyncWebServerRequest *_request){
+//if (!_check_scan){ return; }
+//  _check_scan=false;
+  WiFi.scanDelete(); 
+ int  n = WiFi.scanNetworks(false);
+ 
+ // int  n = WiFi.scanComplete();
+  if( n == WIFI_SCAN_RUNNING ){
+   return;
+  }
+  if (n == WIFI_SCAN_FAILED){
+    n=0;
+  }
+ //   _check_scan=false;
+Serial.print("Scan result: ");
+Serial.println(n);
+    DynamicJsonDocument wifijson((n * 120) + 200);
+    //DynamicJsonDocument wifijson(1024);
+    wifijson["message"] = "OK - Busca wifi terminada.";
+    wifijson["command"] = "scanwifi";
+    JsonArray list = wifijson.createNestedArray("values");
+    for (int i = 0; i < n; i++) {
+      JsonArray flobj = list.createNestedArray();
+      flobj.add(WiFi.SSID(i));
+      flobj.add(getQuality(WiFi.RSSI(i)));
+      flobj.add(WiFi.encryptionType(i));
+      flobj.add(WiFi.channel(i));
+      flobj.add(WiFi.RSSI(i));
+    }
+serializeJsonPretty(wifijson,Serial);
+endExec(wifijson, _request);
+//scan_request->send(200, "text/html", "<h1>SCAN teste loop</h1>" );
+}
+
+int getQuality(int i)
+{
+  int dBm = i;
+  if (dBm <= -100)
+    return 0;
+  if (dBm >= -50)
+    return 100;
+  return 2 * (dBm + 100);
+}
+
+
+void scanWIFInew(void *pvParameters){
+  vTaskDelay(100/portTICK_PERIOD_MS); 
+  AsyncWebServerRequest *a_request = (AsyncWebServerRequest *) pvParameters;
+    
+  WiFi.scanDelete(); 
+  WiFi.scanNetworks(false);
+   //for(;;){
+    int  n = WiFi.scanComplete();
+    //vTaskDelay(100/portTICK_PERIOD_MS); 
+    //if( n == WIFI_SCAN_RUNNING ){ continue;  }
+     if (n == WIFI_SCAN_FAILED){
+      n=0;
+    }
+AsyncResponseStream *response = a_request->beginResponseStream("application/json");
+    response->print("{\"message\":\"OK - Busca wifi terminada.\",\"command\":\"scanwifi\",\"values\":[");
+   //DynamicJsonDocument wifijson((n * 120) + 200);
+    //DynamicJsonDocument wifijson(1024);
+  //wifijson["message"] = "OK - Busca wifi terminada.";
+  //wifijson["command"] = "scanwifi";
+  //JsonArray list = wifijson.createNestedArray("values");
+    for (int i = 0; i < n; i++) {
+     // Serial.println(WiFi.SSID(i));
+    // JsonArray flobj = list.createNestedArray();
+    if(i > 0){
+      response->print(",");
+    }
+    response->printf("[\"%s\",%d,%d,%d,%d]",WiFi.SSID(i).c_str(),getQuality(WiFi.RSSI(i)),WiFi.encryptionType(i),WiFi.channel(i),WiFi.RSSI(i));
+    // flobj.add(WiFi.SSID(i));
+    // flobj.add(getQuality(WiFi.RSSI(i)));
+    // flobj.add(WiFi.encryptionType(i));
+    // flobj.add(WiFi.channel(i));
+    // flobj.add(WiFi.RSSI(i));
+    }
+     response->print("]}");
+//a_request->send(200, "text/html", "mais um teste 2" );    
+//serializeJsonPretty(wifijson,Serial);
+//a_request->send(200, "application/json", wifijson.as<String>() );
+//a_request->send(200, "text/html", "wifijson.as<String>()" );
+//endExec(wifijson, _request);
+
+  //Serial.println(wifijson.memoryUsage());
+  //serializeJsonPretty(wifijson, *response);
+  
+ //   Serial.println("Send ");
+  a_request->send(response);
+  WiFi.scanDelete(); 
+    vTaskDelete(NULL);
+ //   }
+
+
+  
+  
+  //vTaskDelete(NULL);
 }
 
 #endif
