@@ -102,6 +102,7 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
     //yield();
    // FSInfo fs_info;
    // LittleFS.info(fs_info);
+   // request->client()->setRxTimeout(60000); //fix for timeout
     request->_tempObject = new uploadData;
     uploadData *obj = (uploadData *)request->_tempObject;
     obj->message = "OK - Finalizado com sucesso.";
@@ -125,7 +126,15 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
       }
       if (!Update.begin(maxSketchSpace))
       **/
-      if (!Update.begin(UPDATE_SIZE_UNKNOWN)){ 
+     uint32_t maxSketchSpace;
+     #ifdef ESP32
+           maxSketchSpace = UPDATE_SIZE_UNKNOWN;
+     #elif defined(ESP8266)
+         //maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+         maxSketchSpace = ESP.getFreeSketchSpace();
+    #endif
+     
+      if (!Update.begin(maxSketchSpace)){ 
         // start with max available size
         uint8_t updateerror = Update.getError();
         obj->hasError = true;
@@ -134,13 +143,25 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
       }
       else
       {
-        //Update.begin()
-        //Update.runAsync(true); 
+          #if defined(ESP8266)
+          Update.runAsync(true);
+         #endif
+           ;;
       }
     }
     else
     {
-      if (obj->total_sz > (LittleFS.totalBytes() - LittleFS.usedBytes()))
+     size_t usable=1000000;
+         #ifdef ESP32
+           usable =  (LittleFS.totalBytes() - LittleFS.usedBytes()); 
+     #elif defined(ESP8266)
+              FSInfo fs_info;
+              LittleFS.info(fs_info);
+              usable = (fs_info.totalBytes - fs_info.usedBytes); 
+    #endif
+
+     
+      if (obj->total_sz > usable)
       {
         obj->message = "ERRO - espaço insuficiente para gravar o arquivo.";
         obj->hasError = true;
@@ -171,9 +192,9 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
     {
       if (Update.write(data, len) != len)
       {
-        uint8_t updateerror = Update.getError();
+        String updateerror = Update.getErrorString();
         obj->hasError = true;
-        obj->message = "ERRO - aplicando atualização cod:" + String(updateerror);
+        obj->message = "ERRO - aplicando atualização cod:" + updateerror;
         return;
       }
     }

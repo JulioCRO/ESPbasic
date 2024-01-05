@@ -7,16 +7,26 @@
 #include <esp_wifi.h>
 #include <AsyncTCP.h>
 #include <ESPmDNS.h>
-#include "ESP32SSDP.h"
+#include "ESP32SSDP/ESP32SSDP.h"
 #include <DNSServer.h>
 #include <Update.h>
 #elif defined(ESP8266)
 #include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
 #include <ESP8266mDNS.h>
+#include <DNSServer.h>
+#include "ESP8266SSDP/ESP8266SSDP.h"
+extern "C"
+{
+#include <user_interface.h>
+}
+os_timer_t coreloop;
 #endif
+
+
+
 #include <ESPAsyncWebServer.h>
-#include "FS.h"
+//#include "FS.h"
 #include <LittleFS.h>
 
 #include <ArduinoJson.h>
@@ -180,11 +190,11 @@ void getHeapStatus(){
   Serial.println("Free   \tmaxblk\tminimum\tsize");
   Serial.print(ESP.getFreeHeap());
   Serial.print("\t");
-  Serial.print(ESP.getMaxAllocHeap());
+//  Serial.print(ESP.getMaxAllocHeap());
   Serial.print("\t");
-  Serial.print(ESP.getMinFreeHeap());
+//  Serial.print(ESP.getMinFreeHeap());
   Serial.print("\t");
-  Serial.println(ESP.getHeapSize());
+//  Serial.println(ESP.getHeapSize());
 }
 
 
@@ -207,11 +217,7 @@ void basicLoop(){
   addLoopFunction([](){
 if(DO_ESP_RESET){
     delay(500);
-   #ifdef ESP32
-      ESP.restart();
-     #elif defined(ESP8266)
-       ESP.reset();
-  #endif
+    ESP.restart();
 }
 },"ESP reset agendado");
 
@@ -226,9 +232,24 @@ if(DO_ESP_RESET){
 }
 
 #elif defined(ESP8266)
-void wifimon();
-void wifimon(){
+void basicLoop();
+void basicLoopSched(void*z);
 
+void basicLoopSched(void*z){
+loopFunction();
+}
+
+void basicLoop(){
+    addLoopFunction([](){
+    MDNS.update();
+if(DO_ESP_RESET){
+    delay(500);
+       ESP.reset();
+      
+}
+},"ESP reset agendado");
+    os_timer_setfn(&coreloop, basicLoopSched, NULL);
+    os_timer_arm(&coreloop, 100, true);
 }
 
 #endif
@@ -254,6 +275,7 @@ void loopFunction(){
 	}
 }
 
+#ifdef ESP32
 
 bool subExecListfiles(AsyncWebServerRequest *request, void *outros){
   DynamicJsonDocument json(512);
@@ -288,5 +310,39 @@ bool subExecListfiles(AsyncWebServerRequest *request, void *outros){
   return true;
 
 }
+#elif defined(ESP8266)
+bool subExecListfiles(AsyncWebServerRequest *request, void *outros)
+{
+  DynamicJsonDocument json(512);
+  if (LittleFS.begin())
+  {
+    json["message"] = "OK - Lista de arquivos.";
+    Dir dir = LittleFS.openDir("");
+    int i = 0;
+    //char str[10];
+    JsonArray list = json.createNestedArray("values");
+    while (dir.next())
+    {
+      JsonArray flobj = list.createNestedArray();
+      flobj.add(dir.fileName());
+      flobj.add(dir.fileSize());
+      i++;
+    }
+    if (i == 0)
+    {
+      json["message"] = "OK - Sem arquivos.";
+    }
+  }
+  else
+  {
+    json["message"] = "ERRO - Falha listando arquivos";
+  }
+  json["command"]="files";
+  endExec(json, request);
+  return true;
+
+}
+#endif
+
 
 #endif

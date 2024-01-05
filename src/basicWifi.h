@@ -8,10 +8,6 @@
 
 #include <common.h>
 
-
-
-
-
 DNSServer DNS;
 
 
@@ -61,14 +57,18 @@ _wifimon_ct=0;
        // SSDP.setSerialNumber("00000000001");
         SSDP.setURL("index.html");
         SSDP.setModelName(SSDP_MODEL);
-        SSDP.setModelDescription("PROTOCOM_CORE");
-        //SSDP.setModelNumber("00000000001");
+       // SSDP.setModelNumber("00000000001");
         //SSDP.setModelURL("http://www.meethue.com");
         SSDP.setManufacturer("PROTOCOM");
         SSDP.setManufacturerURL("https://protocom.tech.br");
-        SSDP.setDeviceType("rootdevice"); //to appear as root device, other examples: MediaRenderer, MediaServer ...
         SSDP.setServerName("SSDPServer/1.0");
+
+        
+
+     #ifdef ESP32
         SSDP.setUUID("50524f54-4f43-4f4d-9000-cda0e6");
+        SSDP.setModelDescription("PROTOCOM_CORE");
+        
         SSDP.setIcons(  "<icon>"
                         "<mimetype>image/png</mimetype>"
                         "<height>48</height>"
@@ -76,6 +76,7 @@ _wifimon_ct=0;
                         "<depth>24</depth>"
                         "<url>icon48.png</url>"
                         "</icon>");
+           
         SSDP.setServices(  "<service>"
                            "<serviceType>urn:schemas-upnp-org:service:SwitchPower:1</serviceType>"
                            "<serviceId>urn:upnp-org:serviceId:SwitchPower:1</serviceId>"
@@ -83,6 +84,10 @@ _wifimon_ct=0;
                            "<controlURL>/SwitchPower/Control</controlURL>"
                            "<eventSubURL>/SwitchPower/Event</eventSubURL>"
                            "</service>");
+     SSDP.setDeviceType("rootdevice"); //to appear as root device, other examples: MediaRenderer, MediaServer ...
+     #elif defined(ESP8266)
+      SSDP.setDeviceType("upnp:rootdevice"); //to appear as root device, other examples: MediaRenderer, MediaServer ...
+     #endif
         SSDP.begin();
        //  MDNS.addService("http", "tcp", 80);
         logger("WIFI", "SSDP configurado.");
@@ -186,10 +191,10 @@ if (WiFi.isConnected()){
     WiFi.hostname(HOST_NAME);
 
 
-  char pout[512]={0};
+  //char pout[512]={0};
   
     logger("WIFI", "STA config.");
-    bool sta_dhcp = config["sta_autocfg_bln"].as<bool>();
+    bool sta_dhcp = config["sta_dhcp"].as<bool>();
     if (!sta_dhcp)
     {
       IPAddress staip, gateip, subip, dns1ip, dns2ip;
@@ -235,7 +240,7 @@ String getMacAddr(int sz){
   return mac.substring(idx);
 
 }
-
+#ifdef ESP32
 void scanWIFI(AsyncWebServerRequest *_request){
  xTaskCreate(scanWIFInew,    // Função a ser chamada
     "Scan WiFi",   // Nome da tarefa
@@ -246,28 +251,39 @@ void scanWIFI(AsyncWebServerRequest *_request){
   );
 
 }
-
-void scanWIFIResult(AsyncWebServerRequest *_request){
-//if (!_check_scan){ return; }
-//  _check_scan=false;
+void scanWIFInew(void *pvParameters){
+  vTaskDelay(100/portTICK_PERIOD_MS); 
+  AsyncWebServerRequest *a_request = (AsyncWebServerRequest *) pvParameters;
+    
   WiFi.scanDelete(); 
- int  n = WiFi.scanNetworks(false);
- 
- // int  n = WiFi.scanComplete();
-  if( n == WIFI_SCAN_RUNNING ){
-   return;
-  }
-  if (n == WIFI_SCAN_FAILED){
-    n=0;
-  }
- //   _check_scan=false;
-Serial.print("Scan result: ");
-Serial.println(n);
-    DynamicJsonDocument wifijson((n * 120) + 200);
-    //DynamicJsonDocument wifijson(1024);
-    wifijson["message"] = "OK - Busca wifi terminada.";
-    wifijson["command"] = "scanwifi";
-    JsonArray list = wifijson.createNestedArray("values");
+  WiFi.scanNetworks(false);
+    int  n = WiFi.scanComplete();
+     if (n == WIFI_SCAN_FAILED){
+      n=0;
+    }
+AsyncResponseStream *response = a_request->beginResponseStream("application/json");
+    response->print("{\"message\":\"OK - Busca wifi terminada.\",\"command\":\"scanwifi\",\"values\":[");
+    for (int i = 0; i < n; i++) {
+        if(i > 0){ response->print(","); }
+    response->printf("[\"%s\",%d,%d,%d,%d]",WiFi.SSID(i).c_str(),getQuality(WiFi.RSSI(i)),WiFi.encryptionType(i),WiFi.channel(i),WiFi.RSSI(i));
+     }
+     response->print("]}");
+     a_request->send(response);
+     WiFi.scanDelete(); 
+     vTaskDelete(NULL);
+}
+
+
+
+
+
+#elif defined(ESP8266)
+void scanWIFI(AsyncWebServerRequest *_request){
+    WiFi.scanNetworksAsync([_request](int n) {
+    DynamicJsonDocument json((n * 120) + 200);
+    json["message"] = "OK - Busca wifi terminada.";
+    json["command"] = "scanwifi";
+    JsonArray list = json.createNestedArray("values");
     for (int i = 0; i < n; i++) {
       JsonArray flobj = list.createNestedArray();
       flobj.add(WiFi.SSID(i));
@@ -275,11 +291,14 @@ Serial.println(n);
       flobj.add(WiFi.encryptionType(i));
       flobj.add(WiFi.channel(i));
       flobj.add(WiFi.RSSI(i));
+      
     }
-serializeJsonPretty(wifijson,Serial);
-endExec(wifijson, _request);
-//scan_request->send(200, "text/html", "<h1>SCAN teste loop</h1>" );
+    endExec(json, _request);
+  });
 }
+#endif
+
+
 
 int getQuality(int i)
 {
@@ -290,63 +309,6 @@ int getQuality(int i)
     return 100;
   return 2 * (dBm + 100);
 }
-
-
-void scanWIFInew(void *pvParameters){
-  vTaskDelay(100/portTICK_PERIOD_MS); 
-  AsyncWebServerRequest *a_request = (AsyncWebServerRequest *) pvParameters;
-    
-  WiFi.scanDelete(); 
-  WiFi.scanNetworks(false);
-   //for(;;){
-    int  n = WiFi.scanComplete();
-    //vTaskDelay(100/portTICK_PERIOD_MS); 
-    //if( n == WIFI_SCAN_RUNNING ){ continue;  }
-     if (n == WIFI_SCAN_FAILED){
-      n=0;
-    }
-AsyncResponseStream *response = a_request->beginResponseStream("application/json");
-    response->print("{\"message\":\"OK - Busca wifi terminada.\",\"command\":\"scanwifi\",\"values\":[");
-   //DynamicJsonDocument wifijson((n * 120) + 200);
-    //DynamicJsonDocument wifijson(1024);
-  //wifijson["message"] = "OK - Busca wifi terminada.";
-  //wifijson["command"] = "scanwifi";
-  //JsonArray list = wifijson.createNestedArray("values");
-    for (int i = 0; i < n; i++) {
-     // Serial.println(WiFi.SSID(i));
-    // JsonArray flobj = list.createNestedArray();
-    if(i > 0){
-      response->print(",");
-    }
-    response->printf("[\"%s\",%d,%d,%d,%d]",WiFi.SSID(i).c_str(),getQuality(WiFi.RSSI(i)),WiFi.encryptionType(i),WiFi.channel(i),WiFi.RSSI(i));
-    // flobj.add(WiFi.SSID(i));
-    // flobj.add(getQuality(WiFi.RSSI(i)));
-    // flobj.add(WiFi.encryptionType(i));
-    // flobj.add(WiFi.channel(i));
-    // flobj.add(WiFi.RSSI(i));
-    }
-     response->print("]}");
-//a_request->send(200, "text/html", "mais um teste 2" );    
-//serializeJsonPretty(wifijson,Serial);
-//a_request->send(200, "application/json", wifijson.as<String>() );
-//a_request->send(200, "text/html", "wifijson.as<String>()" );
-//endExec(wifijson, _request);
-
-  //Serial.println(wifijson.memoryUsage());
-  //serializeJsonPretty(wifijson, *response);
-  
- //   Serial.println("Send ");
-  a_request->send(response);
-  WiFi.scanDelete(); 
-    vTaskDelete(NULL);
- //   }
-
-
-  
-  
-  //vTaskDelete(NULL);
-}
-
 #endif
 
 
