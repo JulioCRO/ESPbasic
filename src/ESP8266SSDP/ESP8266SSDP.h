@@ -25,7 +25,7 @@ License (MIT license):
   THE SOFTWARE.
 
 */
-
+#if defined(ESP8266)
 #ifndef ESP8266SSDP_H
 #define ESP8266SSDP_H
 
@@ -144,4 +144,5 @@ class SSDPClass{
 extern SSDPClass SSDP;
 #endif
 
+#endif
 #endif

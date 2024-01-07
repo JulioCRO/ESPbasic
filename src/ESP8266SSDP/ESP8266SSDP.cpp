@@ -25,6 +25,7 @@ License (MIT license):
   THE SOFTWARE.
 
 */
+#if defined(ESP8266)
 #ifndef LWIP_OPEN_SRC
 #define LWIP_OPEN_SRC
 #endif
@@ -549,4 +550,5 @@ void SSDPClass::_stopTimer() {
 
 #if !defined(NO_GLOBAL_INSTANCES) && !defined(NO_GLOBAL_SSDP)
 SSDPClass SSDP;
+#endif
 #endif

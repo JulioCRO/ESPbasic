@@ -20,21 +20,19 @@ int _update_step=0;
 AsyncWebServer server(80);
 
 void basicServer(){
-      /* SERVER CONFIG */
+  /* SERVER CONFIG */
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "PUT,POST,GET,OPTIONS");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "*");
 
-
   server.rewrite("/", "/index.html");
-	
+  server.rewrite("/index.htm", "/index.html");
 	server.rewrite("/generate_204", "/index.html");
-	
 	server.rewrite("/fwlink", "/index.html");
 
    server.on("/index.html", HTTP_GET, [&](AsyncWebServerRequest *request) {
             request->send(200, "text/html", "<html><header></header><body><h1>INDEX<hr><form method='POST' action='/upload' enctype='multipart/form-data'><input type='file' name='update'><input type='submit' value='Update'></form></h1></body></html>" );
-        });	
+    });	
 
      server.on("/scanwifi", HTTP_GET, [&](AsyncWebServerRequest *request) {
             request->client()->setRxTimeout(60000); //fix for timeout
@@ -43,17 +41,23 @@ void basicServer(){
 	server.serveStatic("/", LittleFS, "/").setDefaultFile("/index.html");
 
   server.on("/files", HTTP_ANY, [](AsyncWebServerRequest * request) {
-    subExecListfiles(request, NULL);
+    subExecFiles(request, NULL);
+  });
+  server.on("/delete", HTTP_ANY, [](AsyncWebServerRequest * request) {
+    subExecDelete(request,(void *) request->arg("file").c_str());
+  });
+
+  server.on("/reboot", HTTP_ANY, [](AsyncWebServerRequest * request) {
+	subExecReboot(request, NULL);
   });
 
   server.onNotFound([](AsyncWebServerRequest * request)
   {
-    if (request->method() == HTTP_OPTIONS)
-    {
+    if (request->method() == HTTP_OPTIONS) {
       logger(INFO,"Response OPTIONS for:" + request->url());
-	  request->send(200);
+	    request->send(200);
     }else{
-	  logger(INFO,"Response NOT FOUND for:" + request->url());
+	    logger(INFO,"Response NOT FOUND for:" + request->url());
       request->send(404, "text/plain", "PROTOCOM 404 ->" + request->url());
     }
 
@@ -126,14 +130,16 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
       }
       if (!Update.begin(maxSketchSpace))
       **/
-     uint32_t maxSketchSpace;
+     uint32_t maxSketchSpace = ESP.getFreeSketchSpace();
+     /**
      #ifdef ESP32
+     ESP.getFreeSketchSpace();
            maxSketchSpace = UPDATE_SIZE_UNKNOWN;
      #elif defined(ESP8266)
          //maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
          maxSketchSpace = ESP.getFreeSketchSpace();
     #endif
-     
+     **/
       if (!Update.begin(maxSketchSpace)){ 
         // start with max available size
         uint8_t updateerror = Update.getError();
@@ -152,7 +158,7 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
     else
     {
      size_t usable=1000000;
-         #ifdef ESP32
+    #ifdef ESP32
            usable =  (LittleFS.totalBytes() - LittleFS.usedBytes()); 
      #elif defined(ESP8266)
               FSInfo fs_info;
@@ -192,7 +198,13 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
     {
       if (Update.write(data, len) != len)
       {
-        String updateerror = Update.getErrorString();
+       String updateerror = "NOT_SET";
+            #ifdef ESP32
+            updateerror = Update.errorString();
+            #elif defined(ESP8266)
+            updateerror = Update.getErrorString();
+            #endif
+        
         obj->hasError = true;
         obj->message = "ERRO - aplicando atualização cod:" + updateerror;
         return;

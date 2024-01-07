@@ -265,7 +265,12 @@ AsyncResponseStream *response = a_request->beginResponseStream("application/json
     response->print("{\"message\":\"OK - Busca wifi terminada.\",\"command\":\"scanwifi\",\"values\":[");
     for (int i = 0; i < n; i++) {
         if(i > 0){ response->print(","); }
-    response->printf("[\"%s\",%d,%d,%d,%d]",WiFi.SSID(i).c_str(),getQuality(WiFi.RSSI(i)),WiFi.encryptionType(i),WiFi.channel(i),WiFi.RSSI(i));
+    response->printf("[\"%s\",%d,%d,%d,%d]",
+    WiFi.SSID(i).c_str(),
+    getQuality(WiFi.RSSI(i)),
+    WiFi.encryptionType(i),
+    WiFi.channel(i),
+    WiFi.RSSI(i));
      }
      response->print("]}");
      a_request->send(response);

@@ -68,8 +68,10 @@ void logger(const char type[10], String msg);
 bool parseJSON(String fileORjson, DynamicJsonDocument &json);
 void endExec(DynamicJsonDocument &json, AsyncWebServerRequest *request);
 void getHeapStatus();
-bool subExecListfiles(AsyncWebServerRequest *request, void *outros);
 
+bool subExecFiles(AsyncWebServerRequest *request, void *outros);
+bool subExecDelete(AsyncWebServerRequest *request, void *outros);
+void subExecReboot(AsyncWebServerRequest *request, void *outros);
 
 void logger(const char type[10], String msg) {
   Serial.printf("[%s] %s\r\n", type, msg.c_str());
@@ -140,33 +142,16 @@ void endExec(DynamicJsonDocument &json, AsyncWebServerRequest *request)
     json["command"] = "Não definido";
   }
   json["client"] = "Serial";
-  json["source"] = "CLIENT_SERIAL";
-  if (request) {
-    Serial.println("request");
+ if (request) {
     AsyncResponseStream *response = request->beginResponseStream("application/json");
-    Serial.println("End_request");
-    json["source"] = "CLIENT_AP";
-    Serial.println("End_source");
-    /**
-    if (ON_STA_FILTER(request)) {
-      Serial.println("request filter");
-     json["source"] = "CLIENT_STA";
-    }
-    **/
-   Serial.println(request->client()->remoteIP().toString());
-   json["client"] = request->client()->remoteIP().toString();
-   Serial.println("Serialize ");
+    json["client"] = request->client()->remoteIP().toString();
     serializeJsonPretty(json, *response);
-    Serial.println("Send ");
     request->send(response);
   }
-Serial.println("Passou daqui");
-
-  bool hasdata = false;
+ bool hasdata = false;
   Serial.println("");
-  //Serial.println("-----------------------------------------------------------");
- // Serial.printf("COMMAND: %s FROM: %s\r\n", json["command"].as<const char *>(), json["source"].as<const char *>());
- // Serial.println("-----------------------------------------------------------");
+  Serial.printf("COMMAND: %s FROM: %s\r\n", json["command"].as<const char *>(), json["client"].as<const char *>());
+  Serial.println("-----------------------------------------------------------");
   JsonArray array = json["values"].as<JsonArray>();
   for (JsonVariant v : array) {
     hasdata = true;
@@ -277,7 +262,7 @@ void loopFunction(){
 
 #ifdef ESP32
 
-bool subExecListfiles(AsyncWebServerRequest *request, void *outros){
+bool subExecFiles(AsyncWebServerRequest *request, void *outros){
   DynamicJsonDocument json(512);
   if (LittleFS.begin()){
     json["message"] = "OK - Lista de arquivos.";
@@ -293,8 +278,9 @@ bool subExecListfiles(AsyncWebServerRequest *request, void *outros){
       //Serial.println(file.name());
       char name[64]={0};
       strcpy(name,file.name());
-      flobj.add(name);
       flobj.add(file.size());
+      flobj.add(name);
+      
       i++;
       file = dir.openNextFile();
     }
@@ -311,7 +297,7 @@ bool subExecListfiles(AsyncWebServerRequest *request, void *outros){
 
 }
 #elif defined(ESP8266)
-bool subExecListfiles(AsyncWebServerRequest *request, void *outros)
+bool subExecFiles(AsyncWebServerRequest *request, void *outros)
 {
   DynamicJsonDocument json(512);
   if (LittleFS.begin())
@@ -344,5 +330,41 @@ bool subExecListfiles(AsyncWebServerRequest *request, void *outros)
 }
 #endif
 
+bool subExecDelete(AsyncWebServerRequest *request, void *outros){
+  DynamicJsonDocument json(256);
+  String val = ( char *) outros;
+  if (!val.startsWith("/")){
+    val = "/"+val;
+  }
+  if (!LittleFS.exists(val))
+  {
+    json["message"] = "ERRO - Arquivo não existe: " + val;
+  }
+  else
+  {
+    if (LittleFS.remove(val))
+    {
+      json["message"] = "OK - Arquivo removido: " + val;
+
+    }
+    else
+    {
+      json["message"] = "ERRO - Falha removendo arquivo: " + val;
+    }
+  }
+  json["command"]="delete";
+  endExec(json, request);
+  return true;
+}
+
+void subExecReboot(AsyncWebServerRequest *request, void *outros)
+{
+  DynamicJsonDocument json(256);
+  json["message"] = "OK - Reiniciando.";
+  json["command"]="reboot";
+  DO_ESP_RESET = true;
+  endExec(json, request);
+  
+}
 
 #endif
