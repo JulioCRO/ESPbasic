@@ -5,6 +5,12 @@
 
 void basicServer();
 void handleUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final);
+void serviceAdd(const char* uri, ArRequestHandlerFunction onRequest);
+void serviceAdd(const char *uri, WebRequestMethodComposite method, ArRequestHandlerFunction onRequest);
+void serviceAdd(const char* uri, WebRequestMethodComposite method, ArRequestHandlerFunction onRequest, ArUploadHandlerFunction onUpload);
+void serviceAdd(const char* uri, WebRequestMethodComposite method, ArRequestHandlerFunction onRequest, ArUploadHandlerFunction onUpload, ArBodyHandlerFunction onBody);
+
+
 
 struct uploadData
 {
@@ -17,7 +23,10 @@ struct uploadData
 };
 int _update_step=0;
 
+String serviceList="";
+
 AsyncWebServer server(80);
+//DynamicJsonDocument services(512);
 
 void basicServer(){
   /* SERVER CONFIG */
@@ -30,24 +39,29 @@ void basicServer(){
 	server.rewrite("/generate_204", "/index.html");
 	server.rewrite("/fwlink", "/index.html");
 
-   server.on("/index.html", HTTP_GET, [&](AsyncWebServerRequest *request) {
+   serviceAdd("/service", HTTP_ANY, [&](AsyncWebServerRequest *request) {
+            request->send(200, "text/plain", serviceList );
+    });	
+
+   serviceAdd("/index.html", HTTP_GET, [&](AsyncWebServerRequest *request) {
             request->send(200, "text/html", "<html><header></header><body><h1>INDEX<hr><form method='POST' action='/upload' enctype='multipart/form-data'><input type='file' name='update'><input type='submit' value='Update'></form></h1></body></html>" );
     });	
 
-     server.on("/scanwifi", HTTP_GET, [&](AsyncWebServerRequest *request) {
+  serviceAdd("/scanwifi", HTTP_GET, [&](AsyncWebServerRequest *request) {
             request->client()->setRxTimeout(60000); //fix for timeout
             scanWIFI(request);
         });	
 	server.serveStatic("/", LittleFS, "/").setDefaultFile("/index.html");
 
-  server.on("/files", HTTP_ANY, [](AsyncWebServerRequest * request) {
+    serviceAdd("/files", HTTP_ANY, [](AsyncWebServerRequest * request) {
     subExecFiles(request, NULL);
   });
-  server.on("/delete", HTTP_ANY, [](AsyncWebServerRequest * request) {
+
+    serviceAdd("/delete", HTTP_ANY, [](AsyncWebServerRequest * request) {
     subExecDelete(request,(void *) request->arg("file").c_str());
   });
 
-  server.on("/reboot", HTTP_ANY, [](AsyncWebServerRequest * request) {
+    serviceAdd("/reboot", HTTP_ANY, [](AsyncWebServerRequest * request) {
 	subExecReboot(request, NULL);
   });
 
@@ -64,11 +78,11 @@ void basicServer(){
   });
 	
 
- server.on("/description.xml", HTTP_GET, [&](AsyncWebServerRequest *request) {
+   serviceAdd("/description.xml", HTTP_GET, [&](AsyncWebServerRequest *request) {
             request->send(200, "text/xml", SSDP.getSchema());
-        });
+ });
 
-server.on(
+serviceAdd(
     "/upload", HTTP_POST, [](AsyncWebServerRequest * request)
   {
     uploadData *obj = (uploadData *)request->_tempObject;
@@ -274,5 +288,28 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
       }
     }
   }
+}
+
+void serviceAdd(const char *uri, WebRequestMethodComposite method, ArRequestHandlerFunction onRequest){
+  serviceList += uri;
+  serviceList += "\r\n";
+ // services["values"]=uri;
+  server.on(uri, method, onRequest);	
+}
+
+void serviceAdd(const char* uri, ArRequestHandlerFunction onRequest){
+  serviceList += uri;
+  serviceList += "\r\n";
+  server.on(uri, onRequest);	
+}
+void serviceAdd(const char* uri, WebRequestMethodComposite method, ArRequestHandlerFunction onRequest, ArUploadHandlerFunction onUpload){
+  serviceList += uri;
+  serviceList += "\r\n";
+  server.on(uri, method, onRequest,onUpload);	
+}
+void serviceAdd(const char* uri, WebRequestMethodComposite method, ArRequestHandlerFunction onRequest, ArUploadHandlerFunction onUpload, ArBodyHandlerFunction onBody){
+  serviceList += uri;
+  serviceList += "\r\n";
+  server.on(uri, method, onRequest,onUpload,onBody);	
 }
 #endif
