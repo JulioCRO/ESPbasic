@@ -40,7 +40,6 @@ void startBasic(){
   Serial.println(__TIME__);
   Serial.println("");
   logger(OK, "Sistema iniciando.");
-  //Serial.println(LittleFS.begin()?OK:ERRO);
   logger(LittleFS.begin()?OK:ERRO, "Sistema de arquivos iniciado...");
   LittleFS.format();
 
@@ -48,8 +47,6 @@ void startBasic(){
 configWIFI();
 basicServer();
 basicLoop();
-//addLoopFunction(getHeapStatus,"Heap status");
-
 }
 
 

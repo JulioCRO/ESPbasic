@@ -21,8 +21,7 @@ void stopAP();
 String wifiStatus(int status);
 String getMacAddr(int sz=12);
 void scanWIFI(AsyncWebServerRequest *_request);
-void scanWIFIResult(AsyncWebServerRequest *_request);
-void scanWIFInew(void *pvParameters);
+void scanWIFI_ESP32(void *pvParameters);
 int getQuality(int i);
 //DynamicJsonDocument wifijson(1024);
 void WiFiMonitor()
@@ -215,8 +214,7 @@ if (WiFi.isConnected()){
      WiFi.setAutoReconnect(true);
      WiFi.waitForConnectResult();
     addLoopFunction(WiFiMonitor, "WiFiMonitor agendado.");
-    //addLoopFunction(scanWIFIResult, "scanWIFIResult agendado.");
-
+    
     if (!MDNS.begin(HOST_NAME)) {
        logger(ERRO, "Iniciando MDNS responder!");
         while(1) {
@@ -242,7 +240,7 @@ String getMacAddr(int sz){
 }
 #ifdef ESP32
 void scanWIFI(AsyncWebServerRequest *_request){
- xTaskCreate(scanWIFInew,    // Função a ser chamada
+ xTaskCreate(scanWIFI_ESP32,    // Função a ser chamada
     "Scan WiFi",   // Nome da tarefa
     10000,            // Tamanho (bytes)
     (void*) _request,            // Parametro a ser passado
@@ -251,7 +249,7 @@ void scanWIFI(AsyncWebServerRequest *_request){
   );
 
 }
-void scanWIFInew(void *pvParameters){
+void scanWIFI_ESP32(void *pvParameters){
   vTaskDelay(100/portTICK_PERIOD_MS); 
   AsyncWebServerRequest *a_request = (AsyncWebServerRequest *) pvParameters;
     

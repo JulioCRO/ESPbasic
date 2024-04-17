@@ -39,7 +39,7 @@ void basicServer(){
 	server.rewrite("/generate_204", "/index.html");
 	server.rewrite("/fwlink", "/index.html");
 
-   serviceAdd("/service", HTTP_ANY, [&](AsyncWebServerRequest *request) {
+   serviceAdd("/service",  HTTP_GET | HTTP_POST, [&](AsyncWebServerRequest *request) {
             request->send(200, "text/plain", serviceList );
     });	
 
@@ -53,15 +53,15 @@ void basicServer(){
         });	
 	server.serveStatic("/", LittleFS, "/").setDefaultFile("/index.html");
 
-    serviceAdd("/files", HTTP_ANY, [](AsyncWebServerRequest * request) {
+    serviceAdd("/files",  HTTP_GET | HTTP_POST, [](AsyncWebServerRequest * request) {
     subExecFiles(request, NULL);
   });
 
-    serviceAdd("/delete", HTTP_ANY, [](AsyncWebServerRequest * request) {
+    serviceAdd("/delete", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest * request) {
     subExecDelete(request,(void *) request->arg("file").c_str());
   });
 
-    serviceAdd("/reboot", HTTP_ANY, [](AsyncWebServerRequest * request) {
+    serviceAdd("/reboot",  HTTP_GET | HTTP_POST, [](AsyncWebServerRequest * request) {
 	subExecReboot(request, NULL);
   });
 

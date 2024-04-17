@@ -137,7 +137,6 @@ bool parseJSON(String fileORjson, DynamicJsonDocument &json)
 
 void endExec(DynamicJsonDocument &json, AsyncWebServerRequest *request)
 {
-  Serial.println("enter");
   if (!json["command"]) {
     json["command"] = "Não definido";
   }
@@ -333,25 +332,20 @@ bool subExecFiles(AsyncWebServerRequest *request, void *outros)
 bool subExecDelete(AsyncWebServerRequest *request, void *outros){
   DynamicJsonDocument json(256);
   String val = ( char *) outros;
+  String out="";
   if (!val.startsWith("/")){
     val = "/"+val;
   }
-  if (!LittleFS.exists(val))
-  {
-    json["message"] = "ERRO - Arquivo não existe: " + val;
-  }
-  else
-  {
-    if (LittleFS.remove(val))
-    {
-      json["message"] = "OK - Arquivo removido: " + val;
-
-    }
-    else
-    {
-      json["message"] = "ERRO - Falha removendo arquivo: " + val;
+  if (!LittleFS.exists(val))  {
+    out = "ERRO - Arquivo não existe: " + val;
+  }  else  {
+    if (LittleFS.remove(val))    {
+      out = "OK - Arquivo removido: " + val;
+    }    else    {
+      out = "ERRO - Falha removendo arquivo: " + val;
     }
   }
+  json["message"]  = out;
   json["command"]="delete";
   endExec(json, request);
   return true;
