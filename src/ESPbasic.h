@@ -5,9 +5,9 @@ int testct=0;
 
 #include <common.h>
 
-#include <Arduino.h>
-#include <LittleFS.h>
-#include "FS.h"
+//#include <Arduino.h>
+//#include <LittleFS.h>
+//#include "FS.h"
 
 
 #include <basicWifi.h>
