@@ -41,7 +41,7 @@ padding: 8px !important;
 		<hr>
 		<input type="file" name="fileToUpload" id="fileToUpload" onchange="fileSelected();" hidden >
 		<div class="row">
-			<div class="col c6"><input type="text" name="filetxt" id="filetxt" onclick="document.getElementById('fileToUpload').click();" class="smooth" placeholder="Click to select file" readonly><a href="http://owenversteeg.com" class="btn btn-sm btn-a btn-custom">Upload</a></div>
+			<div class="col c6"><input type="file" onchange="upload(this.files[0])"><input type="text" name="filetxt" id="filetxt" onclick="document.getElementById('fileToUpload').click();" class="smooth" placeholder="Click to select file" readonly><a href="http://owenversteeg.com" class="btn btn-sm btn-a btn-custom">Upload</a></div>
 			<div class="col c6"><progress id="file" value="55" max="100"> 32% </progress></div>
 		</div>
 		<table class="table"><thead><tr><th>Name</th><th>Size(kb)</th><th>Action</th></thead>
@@ -116,13 +116,9 @@ document.addEventListener("DOMContentLoaded", function(e) {
    exec_files();
 });
 
-</script>
-
-<input type="file" onchange="upload(this.files[0])">
-
-<script>
 function upload(file) {
   let xhr = new XMLHttpRequest();
+
 
   // listen for upload progress
   xhr.upload.onprogress = function(event) {
@@ -140,7 +136,9 @@ function upload(file) {
     console.log('Upload completed successfully.');
   };
 
-  xhr.open('POST', 'https://domain.com/upload');
+  xhr.open('POST', server + '/upload');
+  xhr.setRequestHeader('Access-Control-Allow-Headers', '*');
+  xhr.setRequestHeader('Access-Control-Allow-Origin', '*');
   xhr.send(file);
 }
 </script>
