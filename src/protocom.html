@@ -20,6 +20,12 @@ padding: 8px !important;
 .smooth_file{padding: 5px;}
 table{border-collapse: collapse !important; width: 100%;}
 table td {padding: 2px !important;}
+::backdrop {
+  background-color: #000;
+  opacity: 0.75;
+}
+
+
 		</style>
 	</head>
 	<body>
@@ -51,6 +57,11 @@ table td {padding: 2px !important;}
 		<tr><td>blon</td><td>5</td><td>kkkk</td></tr>
 		</tbody></table>
 		</div>
+		<dialog id="dialog">
+			<p id="dialog_msg">This modal dialog has a groovy backdrop!</p>
+			<button autofocus  id="dialog_ok">OK</button>
+		  </dialog>
+
 	</body>
 	
 <script>
@@ -91,8 +102,9 @@ d.appendChild(b);
 
 function excluir_arquivo(file){
 getjson(server + "/delete?file="+file, function(data){
-alert(data.message);
-exec_files();
+	dialog_msg.innerText=data.message;
+	dialog.showModal();
+    exec_files();
 });
 }
 
@@ -105,25 +117,42 @@ function upload() {
   let xhr = new XMLHttpRequest();
   var fd = new FormData();
   fd.append("file", document.getElementById('fupdate').files[0]);
+    dialog_msg.innerText="Upload started";
+	dialog.showModal();
+    
   // listen for upload progress
   xhr.upload.onprogress = function(event) {
     let percent = Math.round(100 * event.loaded / event.total);
     console.log(`File is ${percent} uploaded.`);
-  };
+	dialog_msg.innerText=`File is ${percent} uploaded.`;
+	};
 
   // handle error
   xhr.upload.onerror = function(err) {
+	dialog_msg.innerText=`Error during the upload: ${xhr.status}.` + err;
       console.log(`Error during the upload: ${xhr.status}.` + err);
   };
 
   // upload completed successfully
   xhr.onload = function(evt) {
     	exec_files();
-        alert(JSON.parse(evt.target.responseText).message);
+        //alert(JSON.parse(evt.target.responseText).message);
+		dialog_msg.innerText=JSON.parse(evt.target.responseText).message;
   };
 
   xhr.open('POST', server + '/upload');
   xhr.send(fd);
 }
+
+const dialog = document.getElementById("dialog");
+const dialog_msg = document.getElementById("dialog_msg");
+const closeButton = document.getElementById("dialog_ok");
+
+
+
+// "Close" button closes the dialog
+closeButton.addEventListener("click", () => {
+  dialog.close();
+});
 </script>
 </html>

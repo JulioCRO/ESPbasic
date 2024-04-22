@@ -62,10 +62,12 @@ typedef void (*functionHolderPtr) ();
 functionHolderPtr functionHolder[CUSTOM_FUNC_QT];
 void addLoopFunction(functionHolderPtr obj, const char msg[64]);
 void loopFunction();
+void internalLoop();
 
 int rmct=600;
 void logger(const char type[10], String msg);
 bool parseJSON(String fileORjson, DynamicJsonDocument &json);
+int validateConfig(const char* key, const char* alt, DynamicJsonDocument &json);
 void endExec(DynamicJsonDocument &json, AsyncWebServerRequest *request);
 void getHeapStatus();
 
@@ -103,10 +105,8 @@ bool parseJSON(String fileORjson, DynamicJsonDocument &json)
     strcpy(sysout, "JSON processando texto");
     error = deserializeJson(json, fileORjson);
   }
-  if (!_setError)
-  {
-    switch (error.code())
-    {
+  if (!_setError)  {
+    switch (error.code())    {
       case DeserializationError::Ok:
         strcat(sysout, " - OK.");
         break;
@@ -152,7 +152,7 @@ void endExec(DynamicJsonDocument &json, AsyncWebServerRequest *request)
   Serial.printf("COMMAND: %s FROM: %s\r\n", json["command"].as<const char *>(), json["client"].as<const char *>());
   Serial.println("-----------------------------------------------------------");
   JsonArray array = json["values"].as<JsonArray>();
-  for (JsonVariant v : array) {
+  for (JsonArray v : array) {
     hasdata = true;
     serializeJson(v, Serial);
     Serial.println("");
@@ -185,18 +185,18 @@ void getHeapStatus(){
 
 
 #ifdef ESP32
-TaskHandle_t basicLoopTask;
-void basicLoopSched( void * pvParameters );
-void basicLoop();
+TaskHandle_t internalLoopTask;
+void internalLoopSched( void * pvParameters );
 
-void basicLoopSched( void * pvParameters ){
+
+void internalLoopSched( void * pvParameters ){
  for(;;){
     loopFunction();
      vTaskDelay(100/portTICK_PERIOD_MS);
  }
 }
 
-void basicLoop(){
+void internalLoop(){
 
   addLoopFunction([](){
 if(DO_ESP_RESET){
@@ -206,24 +206,26 @@ if(DO_ESP_RESET){
 },"ESP reset agendado");
 
   xTaskCreatePinnedToCore(
-                    basicLoopSched,   /* Função da tarefa */
+                    internalLoopSched,   /* Função da tarefa */
                     "LoopSched",  /* nome da tarefa */
                     10000,       /* Tamanho (bytes) */
                     NULL,        /* parâmetro da tarefa */
                     1,           /* prioridade da tarefa */
-                    &basicLoopTask,      /* observa a tarefa criada */
+                    &internalLoopTask,      /* observa a tarefa criada */
                     0);          /* tarefa alocada ao núcleo 0 */  
 }
 
 #elif defined(ESP8266)
-void basicLoop();
-void basicLoopSched(void*z);
+void internalLoopSched(void*z);
 
-void basicLoopSched(void*z){
+void internalLoopSched(void*z){
 loopFunction();
 }
 
-void basicLoop(){
+void internalLoop(){
+      addLoopFunction([](){
+    MDNS.update();
+},"MDNS update agendado");
     addLoopFunction([](){
     MDNS.update();
 if(DO_ESP_RESET){
@@ -232,7 +234,7 @@ if(DO_ESP_RESET){
       
 }
 },"ESP reset agendado");
-    os_timer_setfn(&coreloop, basicLoopSched, NULL);
+    os_timer_setfn(&coreloop, internalLoopSched, NULL);
     os_timer_arm(&coreloop, 100, true);
 }
 
@@ -360,5 +362,18 @@ void subExecReboot(AsyncWebServerRequest *request, void *outros)
   endExec(json, request);
   
 }
+
+
+ int validateConfig(const char* key, const char* alt, DynamicJsonDocument &json){
+bool updated=false;
+if (!json.containsKey(key)){
+json[key]=alt;
+updated=true;
+}
+char sysout[250] = "";
+sprintf(sysout, "Parametro %s valor:%s%s", key,json[key].as<const char *>(), (updated) ? " - Usando default.":" - OK");
+logger(INFO, sysout);
+return updated;
+ }
 
 #endif
