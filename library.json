@@ -1,7 +1,7 @@
 {
   "name":"ESPbasic",
   "description":"Core custom Library for ESP32/ESP8266",
-  "keywords":"async,tcp",
+  "keywords":"async,tcp,webserver,http",
   "authors":
   {
     "name": "Julio Rodrigues",
