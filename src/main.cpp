@@ -1,4 +1,5 @@
 #include <ESPbasic.h>
+#include <class/parameter.h>
 
 
 void setup() {
@@ -11,6 +12,9 @@ serviceAdd("/service", HTTP_ANY, [&](AsyncWebServerRequest *request) {
             request->send(200, "text/html", serviceList );
 });	
 */
+
+Fahrenheit f;
+f.c2f(10);
 
 }
 
