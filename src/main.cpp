@@ -1,5 +1,5 @@
 #include <ESPbasic.h>
-#include <class/parameter.h>
+#include <class/json.h>
 
 
 void setup() {
@@ -13,8 +13,18 @@ serviceAdd("/service", HTTP_ANY, [&](AsyncWebServerRequest *request) {
 });	
 */
 
-Fahrenheit f;
-f.c2f(10);
+delay(3000);
+JsonHelper f;
+
+f.setValue("teste","teste");
+f.setValue("abacate","ok");
+Serial.println(f.getValue("teste"));
+f.printJson();
+JsonHelper p;
+p.openJSON("/cavaco.json",true);
+
+JsonHelper k;
+k.openJSON("/wifi.json",true);
 
 }
 
