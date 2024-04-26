@@ -15,10 +15,10 @@ serviceAdd("/service", HTTP_ANY, [&](AsyncWebServerRequest *request) {
 
 delay(3000);
 JsonHelper f;
-
 f.setValue("teste","teste");
 f.setValue("abacate","ok");
 Serial.println(f.getValue("teste"));
+Serial.println(f.getValue("operacao","updated"));
 f.printJson();
 
 
@@ -27,17 +27,25 @@ p.openJSON("/cavaco.json");
 p.setValue("teste","teste");
 p.setValue("pppppp","ok");
 p.printJson();
+p.saveJson();
 
 
 JsonHelper k;
 k.openJSON("/wifi.json");
-k.setValue("kkkkkkkkkk","ok");
 k.printJson();
+k.saveJson("/wifi.json");
+
+JsonHelper g;
+g.openJSON("/wifi.json");
+p.setValue("teste","teste");
+g.printJson();
+g.saveJson("/wifi2.json");
 
 JsonHelper y;
 y.openJSON("{\"key\":1}");
 y.setValue("yyyyyyyyy","ok");
 y.printJson();
+y.saveJson("/teste.json");
 
 }
 
