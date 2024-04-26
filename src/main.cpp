@@ -1,5 +1,5 @@
 #include <ESPbasic.h>
-#include <class/json.h>
+#include <utils/json.h>
 
 
 void setup() {
@@ -20,11 +20,24 @@ f.setValue("teste","teste");
 f.setValue("abacate","ok");
 Serial.println(f.getValue("teste"));
 f.printJson();
+
+
 JsonHelper p;
-p.openJSON("/cavaco.json",true);
+p.openJSON("/cavaco.json");
+p.setValue("teste","teste");
+p.setValue("pppppp","ok");
+p.printJson();
+
 
 JsonHelper k;
-k.openJSON("/wifi.json",true);
+k.openJSON("/wifi.json");
+k.setValue("kkkkkkkkkk","ok");
+k.printJson();
+
+JsonHelper y;
+y.openJSON("{\"key\":1}");
+y.setValue("yyyyyyyyy","ok");
+y.printJson();
 
 }
 
