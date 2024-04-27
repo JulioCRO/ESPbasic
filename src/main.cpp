@@ -21,7 +21,6 @@ Serial.println(f.getValue("teste"));
 Serial.println(f.getValue("operacao","updated"));
 f.printJson();
 
-
 JsonHelper p;
 p.openJSON("/cavaco.json");
 p.setValue("teste","teste");
@@ -37,7 +36,7 @@ k.saveJson("/wifi.json");
 
 JsonHelper g;
 g.openJSON("/wifi.json");
-p.setValue("teste","teste");
+g.setValue("teste","updated wifi");
 g.printJson();
 g.saveJson("/wifi2.json");
 

@@ -6,7 +6,7 @@
 */
 
 #include <common.h>
-//#include <basicServer.h>
+#include <utils/json.h>
 
 void startBasic();
 void initDevice();
@@ -78,32 +78,12 @@ internalLoop();
 
 void initDevice(){
   logger("INIT", "Iniciando...");
-   strcat(UUIDCHAR,getMacAddr(6).c_str());
-  DynamicJsonDocument config(768);
-parseJSON(CONFIG_FILE, config);
-int test=0;
-    String def_sid_host = "protocom-" + getMacAddr(6);
-  test+= validateConfig("wifi_hostname",def_sid_host.c_str(),config);
-  test+= validateConfig("sta_ssid","familia_rodrigues",config);
-  test+= validateConfig("sta_pass","258456wifi",config);
-  test+= validateConfig("sta_dhcp","1",config);
-  test+= validateConfig("sta_channel","0",config);
-  test+= validateConfig("sta_ip","0.0.0.0",config);
-  test+= validateConfig("sta_gateway_ip", "0.0.0.0",config);
-  test+= validateConfig("sta_subnet_ip","0.0.0.0",config);
-  test+= validateConfig("sta_dns1_ip","0.0.0.0",config);
-  test+= validateConfig("sta_dns2_ip","0.0.0.0",config);
-  test+= validateConfig("ap_pass",getMacAddr(8).c_str(),config);
-  test+= validateConfig("ssdp_name",def_sid_host.c_str(),config);
-  test+= validateConfig("ssdp_model","default",config);
-
-   if(test >0){
-    File jsonFile = LittleFS.open(CONFIG_FILE, "w");
-    serializeJsonPretty(config, jsonFile);
-    jsonFile.close();
-    logger("INIT", "Configuração atualizada salva.");
-   }
-// ############# WIFI SETUP ###############
+  strcat(UUIDCHAR,getMacAddr(6).c_str());
+  JsonHelper config;
+  config.openJSON(CONFIG_FILE);
+  String def_sid_host = "protocom-" + getMacAddr(6);
+ 
+ // ############# WIFI SETUP ###############
 WiFi.setAutoReconnect(false);
 WiFi.mode(WIFI_STA); //default mode
 if (WiFi.isConnected()){
@@ -113,34 +93,30 @@ if (WiFi.isConnected()){
 }
 //  WiFi.softAPdisconnect();
 
-    strncpy(HOST_NAME, config["wifi_hostname"].as<const char *>(), 32);
-    strncpy(SSDP_NAME, config["ssdp_name"].as<const char *>(), 64);
-    strncpy(SSDP_MODEL, config["ssdp_model"].as<const char *>(), 64);
-    strncpy(AP_PASS, config["ap_pass"].as<const char *>(), 32);
+    strncpy(HOST_NAME, config.getValue("wifi_hostname",def_sid_host).c_str(), 32);
+    strncpy(SSDP_NAME, config.getValue("ssdp_name",def_sid_host).c_str(), 64);
+    strncpy(SSDP_MODEL, config.getValue("ssdp_model","default").c_str(), 64);
+    strncpy(AP_PASS, config.getValue("ap_pass",getMacAddr(8)).c_str(), 32);
     
     WiFi.hostname(HOST_NAME);
+ 
+     logger("INIT", "WiFi STA config...");
+     if (config.getValue("sta_dhcp","1") == "0"){
 
-
-  //char pout[512]={0};
-  
-    logger("INIT", "WiFi STA config...");
-    bool sta_dhcp = config["sta_dhcp"].as<bool>();
-    if (!sta_dhcp)
-    {
       IPAddress staip, gateip, subip, dns1ip, dns2ip;
-      staip.fromString(config["sta_ip"].as<const char *>());
-      gateip.fromString(config["sta_gateway_ip"].as<const char *>());
-      subip.fromString(config["sta_subnet_ip"].as<const char *>());
-      dns1ip.fromString(config["sta_dns1_ip"].as<const char *>());
-      dns2ip.fromString(config["sta_dns2_ip"].as<const char *>());
+      staip.fromString(config.getValue("sta_ip","0.0.0.0"));
+      gateip.fromString(config.getValue("sta_gateway_ip","0.0.0.0"));
+      subip.fromString(config.getValue("sta_subnet_ip","0.0.0.0"));
+      dns1ip.fromString(config.getValue("sta_dns1_ip","0.0.0.0"));
+      dns2ip.fromString(config.getValue("sta_dns2_ip","0.0.0.0"));
       WiFi.config(staip, gateip, subip, dns1ip, dns2ip);
 
     }
     char stassid[33] = {0};
     char stapass[64] = {0};
-    strncpy(stassid, config["sta_ssid"].as<const char *>(), 32);
-    strncpy(stapass, config["sta_pass"].as<const char *>(), 63);
-    int stachnl = config["sta_channel"].as<const int>();
+    strncpy(stassid, config.getValue("sta_ssid","familia_rodrigues").c_str(), 32);
+    strncpy(stapass, config.getValue("sta_pass","258456wifi").c_str(), 63);
+    int stachnl = config.getValue("sta_channel","0").toInt();
     WiFi.begin(stassid, stapass, stachnl);
     WiFi.setAutoReconnect(true);
     WiFi.waitForConnectResult();
@@ -155,7 +131,7 @@ if (WiFi.isConnected()){
     }
  MDNS.addService("http", "tcp", 80);
  logger(OK, "MDNS iniciado http://" + String(HOST_NAME) + ".local/index.html");
-
+config.saveJson();
 }
 
 
@@ -331,12 +307,12 @@ AsyncResponseStream *response = a_request->beginResponseStream("application/json
 #elif defined(ESP8266)
 void scanWIFI(AsyncWebServerRequest *_request){
     WiFi.scanNetworksAsync([_request](int n) {
-    DynamicJsonDocument json((n * 120) + 200);
+    JsonDocument json;
     json["message"] = "OK - Busca wifi terminada.";
     json["command"] = "scanwifi";
-    JsonArray list = json.createNestedArray("values");
+    JsonArray list =  json["values"].to<JsonArray>();
     for (int i = 0; i < n; i++) {
-      JsonArray flobj = list.createNestedArray();
+      JsonArray flobj = list.add<JsonArray>();
       flobj.add(WiFi.SSID(i));
       flobj.add(getQuality(WiFi.RSSI(i)));
       flobj.add(WiFi.encryptionType(i));
@@ -399,6 +375,10 @@ void basicServer(){
 	subExecReboot(request, NULL);
   });
 
+  serviceAdd("/format",  HTTP_GET | HTTP_POST, [](AsyncWebServerRequest * request) {
+	subExecFormat(request, NULL);
+  });
+
   server.onNotFound([](AsyncWebServerRequest * request)
   {
     if (request->method() == HTTP_OPTIONS) {
@@ -420,7 +400,7 @@ serviceAdd(
     "/upload", HTTP_POST, [](AsyncWebServerRequest * request)
   {
     uploadData *obj = (uploadData *)request->_tempObject;
-    DynamicJsonDocument json(256);
+    JsonDocument json;
     json["command"] = "upload";
     json["message"] = obj->message;
     json["type"] = (obj->isFirmware) ? "FIRMWARE" : "ARQUIVO";
@@ -607,7 +587,7 @@ void handleUpload(AsyncWebServerRequest *request, String filename, size_t index,
 
 void serviceAdd(const char *uri, WebRequestMethodComposite method, ArRequestHandlerFunction onRequest){
   serviceList += uri;
-  logger(INFO,"Created endpoint for " + serviceList);
+  logger(INFO,"Created endpoint for " + String(uri));
   serviceList += "\r\n";
  // services["values"]=uri;
   server.on(uri, method, onRequest);	

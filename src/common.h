@@ -66,9 +66,7 @@ void internalLoop();
 
 int rmct=600;
 void logger(const char type[10], String msg);
-bool parseJSON(String fileORjson, DynamicJsonDocument &json);
-int validateConfig(const char* key, const char* alt, DynamicJsonDocument &json);
-void endExec(DynamicJsonDocument &json, AsyncWebServerRequest *request);
+void endExec(JsonDocument &json, AsyncWebServerRequest *request);
 void getHeapStatus();
 
 bool subExecFiles(AsyncWebServerRequest *request, void *outros);
@@ -79,6 +77,7 @@ void logger(const char type[10], String msg) {
   Serial.printf("[%s] %s\r\n", type, msg.c_str());
 }
 
+/**
 bool parseJSON(String fileORjson, DynamicJsonDocument &json)
 {
   DeserializationError error;
@@ -134,8 +133,9 @@ bool parseJSON(String fileORjson, DynamicJsonDocument &json)
 
   return !_setError;
 }
+**/
 
-void endExec(DynamicJsonDocument &json, AsyncWebServerRequest *request)
+void endExec(JsonDocument &json, AsyncWebServerRequest *request)
 {
   if (!json["command"]) {
     json["command"] = "Não definido";
@@ -264,7 +264,7 @@ void loopFunction(){
 #ifdef ESP32
 
 bool subExecFiles(AsyncWebServerRequest *request, void *outros){
-  DynamicJsonDocument json(512);
+  JsonDocument json;
   if (LittleFS.begin()){
     json["message"] = "OK - Lista de arquivos.";
     
@@ -273,9 +273,9 @@ bool subExecFiles(AsyncWebServerRequest *request, void *outros){
     int i = 0;
     //char str[10];
     File file = dir.openNextFile();
-    JsonArray list = json.createNestedArray("values");
+    JsonArray list = json["values"].to<JsonArray>(); //.createNestedArray("values");
     while (file){
-      JsonArray flobj = list.createNestedArray();
+      JsonArray flobj = list.add<JsonArray>(); //createNestedArray();
       //Serial.println(file.name());
       char name[64]={0};
       strcpy(name,file.name());
@@ -300,7 +300,7 @@ bool subExecFiles(AsyncWebServerRequest *request, void *outros){
 #elif defined(ESP8266)
 bool subExecFiles(AsyncWebServerRequest *request, void *outros)
 {
-  DynamicJsonDocument json(512);
+  JsonDocument json;
   if (LittleFS.begin())
   {
     json["message"] = "OK - Lista de arquivos.";
@@ -332,7 +332,7 @@ bool subExecFiles(AsyncWebServerRequest *request, void *outros)
 #endif
 
 bool subExecDelete(AsyncWebServerRequest *request, void *outros){
-  DynamicJsonDocument json(256);
+  JsonDocument json;
   String val = ( char *) outros;
   String out="";
   if (!val.startsWith("/")){
@@ -355,7 +355,7 @@ bool subExecDelete(AsyncWebServerRequest *request, void *outros){
 
 void subExecReboot(AsyncWebServerRequest *request, void *outros)
 {
-  DynamicJsonDocument json(256);
+  JsonDocument json;
   json["message"] = "OK - Reiniciando.";
   json["command"]="reboot";
   DO_ESP_RESET = true;
@@ -363,17 +363,16 @@ void subExecReboot(AsyncWebServerRequest *request, void *outros)
   
 }
 
-
- int validateConfig(const char* key, const char* alt, DynamicJsonDocument &json){
-bool updated=false;
-if (!json.containsKey(key)){
-json[key]=alt;
-updated=true;
+void subExecFormat(AsyncWebServerRequest *request, void *outros)
+{
+  JsonDocument json;
+  json["message"] = "OK - Formatado.";
+  json["command"]="format";
+  if(!LittleFS.format()){
+   json["message"] = "ERRO - Formatando.";
+  }
+  endExec(json, request);
+  
 }
-char sysout[250] = "";
-sprintf(sysout, "Parametro %s valor:%s%s", key,json[key].as<const char *>(), (updated) ? " - Usando default.":" - OK");
-logger(INFO, sysout);
-return updated;
- }
 
 #endif
